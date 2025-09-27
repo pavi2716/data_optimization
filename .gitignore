@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+microservice_task/
+Lib/
+Scripts/
+pyvenv.cfg
+
+# Logs and data files
+logs/
+*.json
+refined_data/
+cleaned.json
+metadata.json
+blob_storage/
+
+# Others
+*.egg-info/
