@@ -5,29 +5,55 @@ import torch.nn.functional as F
 import pandas as pd
 import random
 
+# Define quality mapping based on rating
+def map_rating_to_quality(rating):
+    if rating >= 9:
+        return 2  # High Quality
+    elif rating >= 6:
+        return 1  # Medium Quality
+    else:
+        return 0  # Low Quality
+
 # Load pre-trained DistilBERT tokenizer and model
 tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 model = DistilBertForSequenceClassification.from_pretrained(
     'distilbert-base-uncased', num_labels=3
 )
 
-# Step 1: Generate initial ML predictions
+QUALITY_LABELS = {0: "Low Quality", 1: "Medium Quality", 2: "High Quality"}
+
+# Step 1: Generate initial ML predictions (meaningful quality)
 def generate_initial_output(df: pd.DataFrame) -> pd.DataFrame:
     results = []
-    for text in df['text']:
+    for idx, text in enumerate(df['text']):
         inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
         with torch.no_grad():
             logits = model(**inputs).logits
             pred_label = torch.argmax(F.softmax(logits, dim=1)).item()
-        results.append(pred_label)
+        # If rating exists, map to quality (optional for supervised training)
+        if 'rating' in df.columns and not pd.isnull(df.loc[idx, 'rating']):
+            pred_label = map_rating_to_quality(df.loc[idx, 'rating'])
+        results.append(QUALITY_LABELS[pred_label])
     df['initial_output'] = results
     return df
 
 # Step 2: Apply simple Q-learning style refinement (simulated)
 def apply_q_learning(df: pd.DataFrame) -> pd.DataFrame:
-    # Simulate reward-based refinement
-    df['refined_output'] = df['initial_output'].apply(lambda x: x + random.choice([-1,0,1]))
-    df['refined_output'] = df['refined_output'].clip(0,2)  # Keep within valid labels
+    refined_results = []
+    for idx, row in df.iterrows():
+        current_quality = row['initial_output']
+        # Map back to numeric for Q-learning adjustment
+        numeric = [k for k,v in QUALITY_LABELS.items() if v==current_quality][0]
+        # Simulate reward-based refinement using rating
+        if 'rating' in df.columns and not pd.isnull(row['rating']):
+            reward = map_rating_to_quality(row['rating'])
+            # Adjust towards reward
+            numeric = max(0, min(2, numeric + (reward - numeric)))
+        else:
+            # Random small adjustment if no rating
+            numeric = max(0, min(2, numeric + random.choice([-1,0,1])))
+        refined_results.append(QUALITY_LABELS[numeric])
+    df['refined_output'] = refined_results
     return df
 
 # Step 3: Mask sensitive info for privacy
