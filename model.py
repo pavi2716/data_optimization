@@ -5,6 +5,13 @@ import torch.nn.functional as F
 import pandas as pd
 import random
 
+import spacy
+
+# Load spaCy English model once
+nlp = spacy.load("en_core_web_sm")
+
+
+
 # Define quality mapping based on rating
 def map_rating_to_quality(rating):
     if rating >= 9:
@@ -58,6 +65,17 @@ def apply_q_learning(df: pd.DataFrame) -> pd.DataFrame:
 
 # Step 3: Mask sensitive info for privacy
 def anonymize_text(df: pd.DataFrame) -> pd.DataFrame:
-    # Replace names with [MASKED] (very simple example)
-    df['text'] = df['text'].str.replace(r'\b(John|Sarah|Tom|Jane)\b', '[MASKED]', regex=True)
+    """
+    Replace sensitive information (names, dates, emails, organizations, locations, etc.) with [MASKED].
+    """
+    def mask_sensitive(text):
+        doc = nlp(text)
+        masked_text = text
+        for ent in doc.ents:
+            if ent.label_ in ["PERSON", "EMAIL", "DATE", "GPE", "ORG", "CARDINAL"]:
+                masked_text = masked_text.replace(ent.text, "[MASKED]")
+        return masked_text
+
+    df['text'] = df['text'].apply(mask_sensitive)
     return df
+
